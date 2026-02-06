@@ -114,3 +114,44 @@ if st.button("Predict House Price"):
     st.info("Price range reflects model uncertainty and is not a guaranteed market price.")
 
 
+
+# ---------------------------------
+# FEATURE IMPORTANCE (SAFE VERSION)
+# ---------------------------------
+st.markdown("### 📊 Feature Importance (Model Explanation)")
+
+FINAL_FEATURES = [
+    'bedrooms',
+    'bathrooms',
+    'floors',
+    'view',
+    'condition',
+    'sqft_living_log',
+    'house_age',
+    'luxury_score',
+    'size_quality',
+    'city_val'
+]
+
+importance_df = pd.DataFrame({
+    "Feature": FINAL_FEATURES,
+    "Importance": model.feature_importances_
+}).sort_values(by="Importance", ascending=False)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+sns.barplot(
+    data=importance_df,
+    x="Importance",
+    y="Feature",
+    ax=ax
+)
+
+ax.set_title("What Drives House Prices?")
+ax.set_xlabel("Relative Importance")
+ax.set_ylabel("")
+
+st.pyplot(fig)
+
+
+
+
