@@ -107,13 +107,12 @@ st.markdown("### 🔮 Prediction")
 
 if st.button("Predict House Price"):
     X_final = final_engineer(raw_input, city_means)
+
+    # Model prediction (log space)
     log_pred = model.predict(X_final)[0]
     price = np.expm1(log_pred)
-    # SHAP VALUES
-shap_values = explainer.shap_values(X_final)
 
-
-    # Confidence band (±8%)
+    # Confidence range
     low = price * 0.92
     high = price * 1.08
 
@@ -122,9 +121,37 @@ shap_values = explainer.shap_values(X_final)
     col2.metric("Lower Bound", f"${low:,.0f}")
     col3.metric("Upper Bound", f"${high:,.0f}")
 
-    st.info("Price range reflects model uncertainty and is not a guaranteed market price.")
+    st.info(
+        "Price range reflects model uncertainty and is not a guaranteed market price."
+    )
 
+    # -----------------------------
+    # SHAP VALUES
+    # -----------------------------
+    shap_values = explainer.shap_values(X_final)
 
+    st.markdown("### 🧠 Why this price? (SHAP Explanation)")
+    st.caption("Positive values increase price, negative values decrease it.")
+
+    shap_df = pd.DataFrame({
+        "Feature": FINAL_FEATURES,
+        "SHAP Value": shap_values[0]
+    }).sort_values(by="SHAP Value", key=abs, ascending=False)
+
+    fig2, ax2 = plt.subplots(figsize=(9, 5))
+    sns.barplot(
+        data=shap_df,
+        x="SHAP Value",
+        y="Feature",
+        ax=ax2
+    )
+
+    ax2.axvline(0, color="black", linewidth=1)
+    ax2.set_title("Feature Impact on This Prediction")
+    ax2.set_xlabel("Impact on Log Price")
+    ax2.set_ylabel("")
+
+    st.pyplot(fig2)
 
 # ---------------------------------
 # FEATURE IMPORTANCE (SAFE VERSION)
@@ -202,6 +229,7 @@ st.success(
 st.warning(
     f"🔽 Biggest negative driver: **{top_negative['Feature']}**"
 )
+
 
 
 
