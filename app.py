@@ -5,17 +5,20 @@ import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# -----------------------------
+# ---------------------------------
 # PAGE CONFIG
-# -----------------------------
-st.set_page_config(page_title="House Price Predictor", layout="wide")
+# ---------------------------------
+st.set_page_config(
+    page_title="House Price Predictor",
+    layout="wide"
+)
 
-st.title("🏠 House Price Prediction App")
-st.write("Predict house prices using a trained **XGBoost model**")
+st.title("🏠 House Price Prediction System")
+st.caption("XGBoost model with robust feature engineering")
 
-# -----------------------------
-# LOAD MODEL & CITY MEANS
-# -----------------------------
+# ---------------------------------
+# LOAD MODEL & METADATA
+# ---------------------------------
 @st.cache_resource
 def load_artifacts():
     with open("final_optimized_model.pkl", "rb") as f:
@@ -27,53 +30,55 @@ def load_artifacts():
     return model, city_means
 
 model, city_means = load_artifacts()
+global_city_mean = city_means.mean()
 
-# -----------------------------
-# FEATURE ENGINEERING FUNCTION
-# -----------------------------
-def final_engineer(X_df, train_means):
-    X = X_df.copy()
+# ---------------------------------
+# FEATURE ENGINEERING
+# ---------------------------------
+def final_engineer(X, city_means):
+    X = X.copy()
 
     X["sqft_living_log"] = np.log1p(X["sqft_living"])
     X["house_age"] = 2025 - X["yr_built"]
     X["luxury_score"] = X["view"] + X["condition"] + X["waterfront"]
     X["size_quality"] = X["sqft_living_log"] * (X["condition"] + 1)
-    X["city_val"] = X["city"].map(train_means).fillna(train_means.mean())
+    X["city_val"] = X["city"].map(city_means).fillna(global_city_mean)
 
-    cols_to_drop = [
+    drop_cols = [
         "city", "street", "statezip", "date", "country",
         "yr_built", "yr_renovated", "waterfront",
         "sqft_living", "sqft_lot", "sqft_above", "sqft_basement"
     ]
 
-    X = X.drop(columns=[c for c in cols_to_drop if c in X.columns])
-    return X
+    return X.drop(columns=[c for c in drop_cols if c in X.columns])
 
-# -----------------------------
+# ---------------------------------
 # SIDEBAR INPUTS
-# -----------------------------
-st.sidebar.header("🏗️ House Features")
+# ---------------------------------
+st.sidebar.header("🔧 Property Details")
 
 bedrooms = st.sidebar.number_input("Bedrooms", 1, 10, 3)
-bathrooms = st.sidebar.number_input("Bathrooms", 1.0, 10.0, 2.0)
+bathrooms = st.sidebar.number_input("Bathrooms", 1.0, 8.0, 2.0)
 floors = st.sidebar.number_input("Floors", 1, 3, 1)
-sqft_living = st.sidebar.number_input("Living Area (sqft)", 300, 10000, 2100)
-view = st.sidebar.slider("View Score", 0, 4, 0)
+sqft_living = st.sidebar.number_input("Living Area (sqft)", 400, 10000, 2100)
 condition = st.sidebar.slider("Condition", 1, 5, 3)
-waterfront = st.sidebar.selectbox("Waterfront", [0, 1])
-yr_built = st.sidebar.number_input("Year Built", 1900, 2025, 2010)
+view = st.sidebar.slider("View Quality", 0, 4, 0)
+waterfront = st.sidebar.selectbox("Waterfront", ["No", "Yes"])
+yr_built = st.sidebar.number_input("Year Built", 1900, 2025, 2012)
 city = st.sidebar.selectbox("City", sorted(city_means.index.tolist()))
 
-# -----------------------------
-# CREATE INPUT DATAFRAME
-# -----------------------------
-input_df = pd.DataFrame({
+waterfront = 1 if waterfront == "Yes" else 0
+
+# ---------------------------------
+# INPUT DATAFRAME
+# ---------------------------------
+raw_input = pd.DataFrame({
     "bedrooms": [bedrooms],
     "bathrooms": [bathrooms],
     "floors": [floors],
     "sqft_living": [sqft_living],
-    "sqft_lot": [0],
-    "sqft_above": [0],
+    "sqft_lot": [1],
+    "sqft_above": [1],
     "sqft_basement": [0],
     "view": [view],
     "condition": [condition],
@@ -87,27 +92,23 @@ input_df = pd.DataFrame({
     "date": ["na"]
 })
 
-# -----------------------------
+# ---------------------------------
 # PREDICTION
-# -----------------------------
-if st.button("🔮 Predict Price"):
-    engineered_input = final_engineer(input_df, city_means)
-    log_price = model.predict(engineered_input)
-    price = np.expm1(log_price)[0]
+# ---------------------------------
+st.markdown("### 🔮 Prediction")
 
-    st.success(f"💰 Estimated House Price: **${price:,.2f}**")
+if st.button("Predict House Price"):
+    X_final = final_engineer(raw_input, city_means)
+    log_pred = model.predict(X_final)[0]
+    price = np.expm1(log_pred)
 
-# -----------------------------
-# FEATURE IMPORTANCE
-# -----------------------------
-st.header("📊 Model Feature Importance")
+    # Confidence band (±8%)
+    low = price * 0.92
+    high = price * 1.08
 
-importance_df = pd.DataFrame({
-    "Feature": model.feature_names_in_,
-    "Importance": model.feature_importances_
-}).sort_values(by="Importance", ascending=False)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Estimated Price", f"${price:,.0f}")
+    col2.metric("Lower Bound", f"${low:,.0f}")
+    col3.metric("Upper Bound", f"${high:,.0f}")
 
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.barplot(data=importance_df, x="Importance", y="Feature", ax=ax)
-ax.set_title("What Drives House Prices?")
-st.pyplot(fig)
+    st.info("Price range reflects mo
