@@ -111,4 +111,6 @@ if st.button("Predict House Price"):
     col2.metric("Lower Bound", f"${low:,.0f}")
     col3.metric("Upper Bound", f"${high:,.0f}")
 
-    st.info("Price range reflects mo
+    st.info("Price range reflects model uncertainty and is not a guaranteed market price.")
+
+
