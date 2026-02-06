@@ -4,22 +4,21 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
-import shap
 
-# --------------------------------------------------
+# ---------------------------------
 # PAGE CONFIG
-# --------------------------------------------------
+# ---------------------------------
 st.set_page_config(
     page_title="House Price Predictor",
     layout="wide"
 )
 
-st.title("🏠 House Price Prediction App")
-st.caption("XGBoost model with explainable AI (SHAP)")
+st.title("🏠 House Price Prediction System")
+st.caption("XGBoost model with robust feature engineering")
 
-# --------------------------------------------------
-# LOAD MODEL & CITY MEANS (SAFE CACHING)
-# --------------------------------------------------
+# ---------------------------------
+# LOAD MODEL & METADATA
+# ---------------------------------
 @st.cache_resource
 def load_artifacts():
     with open("final_optimized_model.pkl", "rb") as f:
@@ -33,31 +32,9 @@ def load_artifacts():
 model, city_means = load_artifacts()
 global_city_mean = city_means.mean()
 
-# --------------------------------------------------
-# SHAP EXPLAINER (NO CACHING — IMPORTANT)
-# --------------------------------------------------
-shap.initjs()
-explainer = shap.TreeExplainer(model)
-
-# --------------------------------------------------
-# FINAL FEATURE LIST (TRAINING ORDER)
-# --------------------------------------------------
-FINAL_FEATURES = [
-    "bedrooms",
-    "bathrooms",
-    "floors",
-    "view",
-    "condition",
-    "sqft_living_log",
-    "house_age",
-    "luxury_score",
-    "size_quality",
-    "city_val"
-]
-
-# --------------------------------------------------
+# ---------------------------------
 # FEATURE ENGINEERING
-# --------------------------------------------------
+# ---------------------------------
 def final_engineer(X, city_means):
     X = X.copy()
 
@@ -75,10 +52,10 @@ def final_engineer(X, city_means):
 
     return X.drop(columns=[c for c in drop_cols if c in X.columns])
 
-# --------------------------------------------------
+# ---------------------------------
 # SIDEBAR INPUTS
-# --------------------------------------------------
-st.sidebar.header("🏗️ Property Details")
+# ---------------------------------
+st.sidebar.header("🔧 Property Details")
 
 bedrooms = st.sidebar.number_input("Bedrooms", 1, 10, 3)
 bathrooms = st.sidebar.number_input("Bathrooms", 1.0, 8.0, 2.0)
@@ -92,9 +69,9 @@ city = st.sidebar.selectbox("City", sorted(city_means.index.tolist()))
 
 waterfront = 1 if waterfront == "Yes" else 0
 
-# --------------------------------------------------
-# RAW INPUT DATA
-# --------------------------------------------------
+# ---------------------------------
+# INPUT DATAFRAME
+# ---------------------------------
 raw_input = pd.DataFrame({
     "bedrooms": [bedrooms],
     "bathrooms": [bathrooms],
@@ -115,19 +92,17 @@ raw_input = pd.DataFrame({
     "date": ["na"]
 })
 
-# --------------------------------------------------
+# ---------------------------------
 # PREDICTION
-# --------------------------------------------------
+# ---------------------------------
 st.markdown("### 🔮 Prediction")
 
 if st.button("Predict House Price"):
     X_final = final_engineer(raw_input, city_means)
-
-    # Predict (log space → dollar space)
     log_pred = model.predict(X_final)[0]
     price = np.expm1(log_pred)
 
-    # Confidence range
+    # Confidence band (±8%)
     low = price * 0.92
     high = price * 1.08
 
@@ -136,42 +111,24 @@ if st.button("Predict House Price"):
     col2.metric("Lower Bound", f"${low:,.0f}")
     col3.metric("Upper Bound", f"${high:,.0f}")
 
-    st.info(
-        "Price range reflects model uncertainty and is not a guaranteed market price."
-    )
+    st.info("Price range reflects model uncertainty and is not a guaranteed market price.")
+# ---------------------------------
+# FEATURE IMPORTANCE (SAFE VERSION)
+# ---------------------------------
+st.markdown("### 📊 Feature Importance (Model Explanation)")
 
-    # --------------------------------------------------
-    # SHAP EXPLANATION (PER HOUSE)
-    # --------------------------------------------------
-    st.markdown("### 🧠 Why this price? (SHAP Explanation)")
-    st.caption("Positive values push the price up, negative values push it down.")
-
-    shap_values = explainer.shap_values(X_final)
-
-    shap_df = pd.DataFrame({
-        "Feature": FINAL_FEATURES,
-        "SHAP Value": shap_values[0]
-    }).sort_values(by="SHAP Value", key=abs, ascending=False)
-
-    fig2, ax2 = plt.subplots(figsize=(9, 5))
-    sns.barplot(
-        data=shap_df,
-        x="SHAP Value",
-        y="Feature",
-        ax=ax2
-    )
-
-    ax2.axvline(0, color="black", linewidth=1)
-    ax2.set_title("Feature Impact on This Prediction")
-    ax2.set_xlabel("Impact on Log Price")
-    ax2.set_ylabel("")
-
-    st.pyplot(fig2)
-
-# --------------------------------------------------
-# GLOBAL FEATURE IMPORTANCE
-# --------------------------------------------------
-st.markdown("### 📊 Global Feature Importance")
+FINAL_FEATURES = [
+    'bedrooms',
+    'bathrooms',
+    'floors',
+    'view',
+    'condition',
+    'sqft_living_log',
+    'house_age',
+    'luxury_score',
+    'size_quality',
+    'city_val'
+]
 
 importance_df = pd.DataFrame({
     "Feature": FINAL_FEATURES,
@@ -186,8 +143,9 @@ sns.barplot(
     ax=ax
 )
 
-ax.set_title("What Drives House Prices Overall?")
+ax.set_title("What Drives House Prices?")
 ax.set_xlabel("Relative Importance")
 ax.set_ylabel("")
 
 st.pyplot(fig)
+
