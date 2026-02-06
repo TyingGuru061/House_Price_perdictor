@@ -140,12 +140,16 @@ sns.barplot(
     data=importance_df,
     x="Importance",
     y="Feature",
-    ax=ax
+    ax=ax,
+    palette='viridis'
 )
 
 ax.set_title("What Drives House Prices?")
-ax.set_xlabel("Relative Importance")
-ax.set_ylabel("")
+ax.set_xlabel("Features")
+ax.set_ylabel("Importance Score")
+plt.grid(axis='x', linestyle='--', alpha=0.7)
+
 
 st.pyplot(fig)
+
 
